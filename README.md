@@ -2,7 +2,7 @@
 
 Reinforcement learning algorithms in one file
 
-*item DDPG for MountainCarContinuous-v0:
+DDPG for MountainCarContinuous-v0:
     ![image](https://github.com/zzzxxxttt/pytorch_rl_iof/blob/master/figures/ddpg_mtcar.png)
 
     Code mainly adopted from https://github.com/lirnli/OpenAI-gym-solutions/blob/master/Continuous_Deep_Deterministic_Policy_Gradient_Net/DDPG%20Class%20ver2.ipynb
