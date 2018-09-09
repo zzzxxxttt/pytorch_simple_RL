@@ -83,7 +83,7 @@ class Critic(nn.Module):
 
 
 def get_action(state):
-  state = torch.from_numpy(process_state(state)).float()
+  state = torch.from_numpy(process_state(state)).float().cuda()
   action_mu, action_sigma = actor(state)
   action_dist = torch.distributions.normal.Normal(action_mu, action_sigma)
   action = action_dist.sample()
@@ -92,16 +92,16 @@ def get_action(state):
 
 
 def get_state_value(state):
-  state = torch.from_numpy(process_state(state)).float()
+  state = torch.from_numpy(process_state(state)).float().cuda()
   state_value = critic(state)
   return state_value.item()
 
 
 def update_actor(state, action, advantage):
-  state = torch.from_numpy(process_state(state)).float()
+  state = torch.from_numpy(process_state(state)).float().cuda()
   action_mu, action_sigma = actor(state)
   action_dist = torch.distributions.normal.Normal(action_mu, action_sigma)
-  act_loss = -action_dist.log_prob(torch.tensor(action)) * advantage
+  act_loss = -action_dist.log_prob(torch.tensor(action).cuda()) * advantage
   entropy = action_dist.entropy()
   loss = act_loss - 1e-4 * entropy
   actor_optimizer.zero_grad()
@@ -111,17 +111,17 @@ def update_actor(state, action, advantage):
 
 
 def update_critic(state, target):
-  state = torch.from_numpy(process_state(state)).float()
+  state = torch.from_numpy(process_state(state)).float().cuda()
   state_value = critic(state)
-  loss = F.mse_loss(state_value, torch.tensor(target))
+  loss = F.mse_loss(state_value, torch.tensor(target).cuda())
   critic_optimizer.zero_grad()
   loss.backward()
   critic_optimizer.step()
   return
 
 
-actor = Actor()
-critic = Critic()
+actor = Actor().cuda()
+critic = Critic().cuda()
 actor_optimizer = optim.Adam(actor.parameters(), lr=cfg.actor_lr)
 critic_optimizer = optim.Adam(critic.parameters(), lr=cfg.critic_lr)
 
