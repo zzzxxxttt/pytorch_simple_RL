@@ -1,6 +1,4 @@
-# pytorch_RL_iof
-
-Reinforcement learning algorithms **in one file**
+# Reinforcement learning algorithms **in one file**
 
 ### 1. DDPG for MountainCarContinuous-v0:
 ![image](https://github.com/zzzxxxttt/pytorch_rl_iof/blob/master/figures/ddpg_mtcar.png)
