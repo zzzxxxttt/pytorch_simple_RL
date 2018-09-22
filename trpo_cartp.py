@@ -23,7 +23,7 @@ def draw_fig():
 
 parser = argparse.ArgumentParser(description='PyTorch TRPO solution of MountainCarContinuous-v0')
 parser.add_argument('--gamma', type=float, default=0.995)
-parser.add_argument('--lambda', type=float, default=0.97)
+parser.add_argument('--gae_lambda', type=float, default=0.97)
 parser.add_argument('--critic_wd', type=float, default=1e-3)
 parser.add_argument('--max_kl', type=int, default=1e-2)
 parser.add_argument('--damping', type=int, default=1e-1)
@@ -196,17 +196,17 @@ def conjugate_gradients(states, loss_grad, nsteps, max_error=1e-10):
 
 def linesearch(actor_loss_fn, params_flat, fullstep, expected_improve_rate, max_decay_steps=10, accept_ratio=0.1):
   loss = actor_loss_fn().item()
-  print("loss before", loss)
+  print("loss before: %.5f" % loss)
   for step in 0.5 ** np.arange(max_decay_steps):
     params_new = params_flat + (step * fullstep).cuda()
     loss_new = actor_loss_fn(params_new).item()
     actual_improve = loss - loss_new
     expected_improve = expected_improve_rate * step
     ratio = actual_improve / expected_improve
-    print("a/e/r", actual_improve, expected_improve.item(), ratio.item())
+    print("a: %.5f\te: %.5f\tr: %.5f" % (actual_improve, expected_improve.item(), ratio.item()))
 
     if ratio > accept_ratio and actual_improve > 0:
-      print("loss after", loss_new)
+      print("loss after: %.5f" % loss_new)
       return True, params_new
   return False, params_flat
 
@@ -225,7 +225,7 @@ def update_actor(states, actions, last_log_probs, advantages):
   fullstep = step_direction * beta
 
   neggdotstepdir = -loss_grad_flat.dot(step_direction)
-  print(("lagrange multiplier:", beta, "grad_norm:", loss_grad_flat.norm().item()))
+  print("lagrange multiplier: %.5f \t grad_norm: %.5f" % (beta, loss_grad_flat.norm().item()))
   params_flat = torch.cat([param.data.view(-1) for param in actor.parameters()])
   success, params_new = linesearch(loss_fn, params_flat, fullstep, neggdotstepdir / beta)
   apply_flat_params(actor, params_new)
@@ -274,27 +274,32 @@ def main():
     reward_batch, \
     next_state_batch, \
     done_batch = map(lambda x: np.array(x).astype(np.float32), zip(*memory))
+
+    state_batch = torch.tensor(state_batch).float().cuda()
     values = get_state_value(state_batch).detach().cpu().numpy()
 
-    returns = np.zeros(action_batch.size(0))
-    deltas = np.zeros(action_batch.size(0))
-    advantages = np.zeros(action_batch.size(0))
+    returns = np.zeros(action_batch.shape)
+    deltas = np.zeros(action_batch.shape)
+    advantages = np.zeros(action_batch.shape)
 
     prev_return = 0
     prev_value = 0
     prev_advantage = 0
-    for i in reversed(range(reward_batch.size(0))):
-      returns[i] = reward_batch[i].item() + cfg.gamma * prev_return * (1 - done_batch[i].item())
-      # 计算当前状态的折扣return和当前状态value的差，即GAE中的delta
-      deltas[i] = reward_batch[i].item() + cfg.gamma * prev_value * (1 - done_batch[i].item()) - values[i].item()
-      # 计算A^GAE来近似真正的advantage，gae_lambda就是GAE中的lambda
-      advantages[i] = deltas[i].item() + cfg.gamma * cfg.gae_lambda * prev_advantage * (1 - done_batch[i].item())
+    for i in reversed(range(reward_batch.shape[0])):
+      returns[i] = reward_batch[i] + cfg.gamma * prev_return * (1 - done_batch[i])
+      # generalized advantage estimation
+      deltas[i] = reward_batch[i] + cfg.gamma * prev_value * (1 - done_batch[i]) - values[i]
+      advantages[i] = deltas[i] + cfg.gamma * cfg.gae_lambda * prev_advantage * (1 - done_batch[i])
 
-      prev_return = returns[i].item()
-      prev_value = values[i].item()
-      prev_advantage = advantages[i].item()
+      prev_return = returns[i]
+      prev_value = values[i]
+      prev_advantage = advantages[i]
 
     advantages = (advantages - advantages.mean()) / advantages.std()
+
+    advantages = torch.tensor(advantages).float().cuda()
+    action_batch = torch.tensor(action_batch).float().cuda()
+    returns = torch.tensor(returns).float().cuda()
 
     # using discounted reward as target q-value to update critic
     update_critic(state_batch, returns)
@@ -306,7 +311,7 @@ def main():
     update_actor(state_batch, action_batch, action_log_probs, advantages)
 
     episode_score /= episode
-    print(',last_score {:8f}, steps {}, ({:2f} sec/eps)'.
+    print('last_score {:5f}, steps {}, ({:2f} sec/eps)'.
           format(episode_score, len(memory), time.perf_counter() - start_time))
     avg_score_plot.append(avg_score_plot[-1] * 0.99 + episode_score * 0.01)
     last_score_plot.append(episode_score)
