@@ -1,5 +1,8 @@
 # Reinforcement learning algorithms **in one file**
 
+This repository is for those who want to know how to implement the RL algorithms after reading the corresponding paper.
+All the algorithms are written in one file, which can let you focus more on the algorithm itself, but not the structure/details of the code.
+
 ### 1. DDPG for MountainCarContinuous-v0:
 ![image](https://github.com/zzzxxxttt/pytorch_rl_iof/blob/master/figures/ddpg_mtcar.png)
 
@@ -21,5 +24,5 @@
 ![image](https://github.com/zzzxxxttt/pytorch_rl_iof/blob/master/figures/trpo_mtcar.png)
 
 - Code mainly adopted from https://github.com/ikostrikov/pytorch-trpo
-- This piece of code is a little bit complicate, I've tried my best to place everything (LBFGS, conjugate gradient, linesearch, GAE, ...) in one file.
+- This piece of code is a little bit complicated, I've tried my best to place everything (LBFGS, conjugate gradient, line search, GAE, ...) in one file.
 - ~ 300 lines, not so horrible, right?
