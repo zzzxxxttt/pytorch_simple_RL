@@ -3,6 +3,11 @@
 This repository is for those who want to know how to implement the RL algorithms after reading the corresponding paper.
 All the algorithms are written in one file, which can let you focus more on the algorithm itself, but not the structure/details of the code.
 
+## Requirements:
+- python>=3.5
+- pytorch>=0.4.0
+- drawnow
+
 ### 1. DDPG for MountainCarContinuous-v0:
 ![image](https://github.com/zzzxxxttt/pytorch_rl_iof/blob/master/figures/ddpg_mtcar.png)
 
