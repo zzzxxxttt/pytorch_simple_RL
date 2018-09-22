@@ -18,7 +18,7 @@
 - Code mainly adopted from https://github.com/JamesChuanggg/pytorch-REINFORCE
 
 ### 4. TRPO for MountainCarContinuous-v0:
-![image](https://github.com/zzzxxxttt/pytorch_rl_iof/blob/master/figures/trpo_cartp.png)
+![image](https://github.com/zzzxxxttt/pytorch_rl_iof/blob/master/figures/trpo_mtcar.png)
 
 - Code mainly adopted from https://github.com/ikostrikov/pytorch-trpo
 - This piece of code is a little bit complicate, I've tried my best to place everything in one file.
