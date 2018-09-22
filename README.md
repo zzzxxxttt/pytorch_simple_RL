@@ -22,4 +22,4 @@
 
 - Code mainly adopted from https://github.com/ikostrikov/pytorch-trpo
 - This piece of code is a little bit complicate, I've tried my best to place everything in one file.
-- ~ 300 lines, not so horrible, wright?
+- ~ 300 lines, not so horrible, right?
