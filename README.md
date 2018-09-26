@@ -1,7 +1,7 @@
 # Reinforcement learning algorithms **in one file**
 
-This repository is for those who want to know how to implement the RL algorithms after reading the corresponding paper.
-All the algorithms are written in one file, which can let you focus more on the algorithm itself, but not the structure/details of the code.
+This repository is for those who want to implement the RL algorithms after reading the corresponding papers.
+All the algorithms are encapsulated in one file, which can let you focus more on the algorithm itself.
 
 ## Requirements:
 - python>=3.5
@@ -31,3 +31,9 @@ All the algorithms are written in one file, which can let you focus more on the 
 - Code mainly adopted from https://github.com/ikostrikov/pytorch-trpo
 - This piece of code is a little bit complicated, I've tried my best to place everything (LBFGS, conjugate gradient, line search, GAE, ...) in one file.
 - ~ 300 lines, not so horrible, right?
+
+### 5. PPO for MountainCarContinuous-v0:
+![image](https://github.com/zzzxxxttt/pytorch_rl_iof/blob/master/figures/ppo_mtcar.png)
+
+- Code mainly adopted from https://github.com/tpbarron/pytorch-ppo
+
