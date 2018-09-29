@@ -1,9 +1,6 @@
 import argparse
 import gym
 import time
-import numpy as np
-from collections import deque
-from itertools import count
 from drawnow import drawnow
 import matplotlib.pyplot as plt
 
@@ -21,7 +18,7 @@ def draw_fig():
   plt.plot(avg_score_plot, 'r-')
 
 
-parser = argparse.ArgumentParser(description='PyTorch REINFORCE solution of MountainCarContinuous-V0')
+parser = argparse.ArgumentParser(description='PyTorch REINFORCE solution of CartPole-V0')
 parser.add_argument('--gamma', type=float, default=0.99)
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--max_episode', type=int, default=1000)
@@ -47,9 +44,7 @@ optimizer = optim.Adam(policy.parameters(), lr=cfg.lr)
 def get_action(state):
   state = torch.from_numpy(state).float().cuda()[None, :]
   action_probs = policy(state)
-  # 生成一个多项分布
   action_dist = torch.distributions.Categorical(action_probs)
-  # 根据多项分布采样
   action = action_dist.sample()
   return action.item()
 
