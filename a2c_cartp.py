@@ -1,6 +1,7 @@
-import argparse
 import gym
+import time
 import numpy as np
+import argparse
 from collections import deque
 from itertools import count
 
@@ -10,15 +11,16 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.nn.init as init
 
-from drawnow import drawnow, figure
 import matplotlib.pyplot as plt
+from drawnow import drawnow
 
-last_score_plot = [0]
-avg_score_plot = [0]
+last_score_plot = []
+avg_score_plot = []
 
 
 def draw_fig():
-  plt.title('reward')
+  plt.ylabel('reward')
+  plt.xlabel('episode')
   plt.plot(last_score_plot, '-')
   plt.plot(avg_score_plot, 'r-')
 
@@ -115,38 +117,48 @@ actor = Actor()
 critic = Critic()
 actor_optimizer = optim.Adam(actor.parameters(), lr=cfg.actor_lr)
 critic_optimizer = optim.Adam(critic.parameters(), lr=cfg.critic_lr)
-
 memory = Memory(10000)
 
-for i in range(cfg.max_episode):
-  episode_durations = 0
-  state = env.reset()
 
-  for t in count():
-    action = get_action(torch.tensor(state).float()[None, :]).item()
-    next_state, reward, done, _ = env.step(action)
+def main():
+  for episode in range(cfg.max_episode):
+    state = env.reset()
+    episode_score = 0
+    start_time = time.perf_counter()
 
-    memory.append([state, action, next_state, reward, done])
-    state = next_state
+    for episode_steps in count():
+      action = get_action(torch.tensor(state).float()[None, :]).item()
+      next_state, reward, done, _ = env.step(action)
 
-    if len(memory) > cfg.batch_size:
-      states, actions, next_states, rewards, dones = \
-        map(lambda x: torch.tensor(x).float(), zip(*memory.sample_batch(cfg.batch_size)))
+      memory.append([state, action, next_state, reward, done])
+      state = next_state
+      episode_score += reward
 
-      targets = rewards + cfg.gamma * get_state_value(next_states).detach() * (1 - dones)
-      td_errors = targets - get_state_value(states).detach()
+      if len(memory) > cfg.batch_size:
+        states, actions, next_states, rewards, dones = \
+          map(lambda x: torch.tensor(x).float(), zip(*memory.sample_batch(cfg.batch_size)))
 
-      update_actor(states=states, actions=actions, advantages=td_errors)
-      update_critic(states, targets)
+        # calculate estimated return
+        targets = rewards + cfg.gamma * get_state_value(next_states).detach() * (1 - dones)
+        td_errors = targets - get_state_value(states).detach()
 
-    if done:
-      episode_durations = t + 1
-      avg_score_plot.append(avg_score_plot[-1] * 0.99 + episode_durations * 0.01)
-      last_score_plot.append(episode_durations)
-      drawnow(draw_fig)
-      break
+        update_actor(states=states, actions=actions, advantages=td_errors)
+        update_critic(states, targets)
 
-print('Complete')
-env.close()
+      if done:
+        print('episode: %d score %.5f, steps %d, (%.2f sec/eps)' %
+              (episode, episode_score, episode_steps, time.perf_counter() - start_time))
+        last_score_plot.append(episode_score)
+        if len(avg_score_plot) == 0:
+          avg_score_plot.append(episode_score)
+        else:
+          avg_score_plot.append(avg_score_plot[-1] * 0.99 + episode_score * 0.01)
+        drawnow(draw_fig)
+        break
 
-plt.pause(0)
+  env.close()
+
+
+if __name__ == '__main__':
+  main()
+  plt.pause(0)

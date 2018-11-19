@@ -26,7 +26,7 @@ def draw_fig():
 parser = argparse.ArgumentParser(description='PyTorch DDPG solution of MountainCarContinuous-V0')
 
 parser.add_argument('--gamma', type=float, default=0.99)
-parser.add_argument('--lr', type=float, default=1e-3)
+parser.add_argument('--lr', type=float, default=1e-4)
 parser.add_argument('--tau', type=float, default=0.001)
 parser.add_argument('--batch_size', type=int, default=256)
 parser.add_argument('--max_episode', type=int, default=200)
@@ -55,7 +55,7 @@ class Memory(object):
 # Reference: https://github.com/rllab/rllab/blob/master/rllab/exploration_strategies/ou_strategy.py
 def OUNoise():
   theta = 0.15
-  sigma = 0.2
+  sigma = 0.3
   mu = 0
   state = 0
   while True:
@@ -119,6 +119,9 @@ def get_q_value(_critic, state, action):
 
 
 def update_actor(state):
+  # here should use the target networks
+  # however, change to actor_target and critic_target can't converge
+  # still don't know why :(
   action = actor(state)
   action = torch.clamp(action, float(env.action_space.low[0]), float(env.action_space.high[0]))
   # using chain rule to calculate the gradients of actor

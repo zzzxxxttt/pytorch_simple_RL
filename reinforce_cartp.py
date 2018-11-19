@@ -1,19 +1,21 @@
-import argparse
 import gym
 import time
-from drawnow import drawnow
+import argparse
 import matplotlib.pyplot as plt
+from drawnow import drawnow
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-last_score_plot = [0]
-avg_score_plot = [0]
+last_score_plot = []
+avg_score_plot = []
 
 
 def draw_fig():
+  plt.ylabel('reward')
+  plt.xlabel('episode')
   plt.plot(last_score_plot, '-')
   plt.plot(avg_score_plot, 'r-')
 
@@ -24,6 +26,7 @@ parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--max_episode', type=int, default=1000)
 cfg = parser.parse_args()
 
+
 class Policy(nn.Module):
   def __init__(self):
     super(Policy, self).__init__()
@@ -31,18 +34,17 @@ class Policy(nn.Module):
     self.fc2 = nn.Linear(128, 2)
 
   def forward(self, x):
-    x = F.relu(self.fc1(x))
+    x = F.elu(self.fc1(x))
     action_probs = F.softmax(self.fc2(x), dim=1)
     return action_probs
 
 
 env = gym.make('CartPole-v0')
-policy = Policy().cuda()
+policy = Policy()
 optimizer = optim.Adam(policy.parameters(), lr=cfg.lr)
 
 
 def get_action(state):
-  state = torch.from_numpy(state).float().cuda()[None, :]
   action_probs = policy(state)
   action_dist = torch.distributions.Categorical(action_probs)
   action = action_dist.sample()
@@ -52,22 +54,18 @@ def get_action(state):
 def update_policy(states, actions, returns):
   action_probs = policy(states)
   action_dist = torch.distributions.Categorical(action_probs)
-  act_loss = -action_dist.log_prob(actions) * returns
+  action_loss = -action_dist.log_prob(actions) * returns
   entropy = action_dist.entropy()
-  loss = torch.mean(act_loss - 1e-4 * entropy)
+  loss = torch.mean(action_loss - 1e-4 * entropy)
   optimizer.zero_grad()
   loss.backward()
-  # torch.nn.utils.clip_grad_norm(policy.parameters(), 40)
   optimizer.step()
   return
 
 
 def main():
-  # env = wrappers.Monitor(env,'./tmp/',force=True)
   state = env.reset()
 
-  iteration_now = 0
-  iteration = 0
   episode = 0
   episode_score = 0
   episode_steps = 0
@@ -78,8 +76,7 @@ def main():
   start_time = time.perf_counter()
 
   while episode < cfg.max_episode:
-    print('\riter {}, ep {}'.format(iteration_now, episode), end='')
-    action = get_action(state)
+    action = get_action(torch.from_numpy(state).float()[None, :])
 
     next_state, reward, done, _ = env.step(action)
     states.append(state)
@@ -88,31 +85,32 @@ def main():
 
     episode_score += reward
     episode_steps += 1
-    iteration_now += 1
-    iteration += 1
 
     if done:
+      # calculate discounted reward
       returns = [rewards[-1]]
       for r in rewards[-2::-1]:
         returns.append(r + cfg.gamma * returns[-1])
 
-      state_batch = torch.tensor(states).float().cuda()
-      action_batch = torch.tensor(actions).float().cuda()
-      return_batch = torch.tensor(returns[::-1]).float().cuda()
+      state_batch = torch.tensor(states).float()
+      action_batch = torch.tensor(actions).float()
+      return_batch = torch.tensor(returns[::-1]).float()
       return_batch = (return_batch - return_batch.mean()) / return_batch.std()
       update_policy(state_batch, action_batch[:, None], return_batch)
 
-      print(', score {:8f}, steps {}, ({:2f} sec/eps)'.
-            format(episode_score, episode_steps, time.perf_counter() - start_time))
-      avg_score_plot.append(avg_score_plot[-1] * 0.99 + episode_score * 0.01)
+      print('episode: %d score %.5f, steps %d, (%.2f sec/eps)' %
+            (episode, episode_score, episode_steps, time.perf_counter() - start_time))
       last_score_plot.append(episode_score)
+      if len(avg_score_plot) == 0:
+        avg_score_plot.append(episode_score)
+      else:
+        avg_score_plot.append(avg_score_plot[-1] * 0.99 + episode_score * 0.01)
       drawnow(draw_fig)
 
       start_time = time.perf_counter()
       episode += 1
       episode_score = 0
       episode_steps = 0
-      iteration_now = 0
 
       state = env.reset()
       states.clear()
