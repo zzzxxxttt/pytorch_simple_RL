@@ -119,9 +119,6 @@ def get_q_value(_critic, state, action):
 
 
 def update_actor(state):
-  # here should use the target networks
-  # however, change to actor_target and critic_target can't converge
-  # still don't know why :(
   action = actor(state)
   action = torch.clamp(action, float(env.action_space.low[0]), float(env.action_space.high[0]))
   # using chain rule to calculate the gradients of actor
