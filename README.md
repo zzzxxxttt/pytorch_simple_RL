@@ -53,3 +53,9 @@ All the algorithms are encapsulated in one file as minimum working examples, whi
 
 - Code mainly adopted from https://github.com/tpbarron/pytorch-ppo
 
+## 7. ACER
+#### Discrete action space: CartPole-v0:
+<img src="https://github.com/zzzxxxttt/pytorch_rl_iof/blob/master/figures/acer_mtcar.png" width="500" />
+
+- Code mainly adopted from https://github.com/dchetelat/acer
+
