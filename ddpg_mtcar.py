@@ -146,9 +146,11 @@ def soft_update(target, source, tau):
 env = gym.make('MountainCarContinuous-v0')
 
 actor = Actor().cuda()
-actor_target = Actor().cuda()
 critic = Critic().cuda()
+actor_target = Actor().cuda()
 critic_target = Critic().cuda()
+actor_target.load_state_dict(actor.state_dict())
+critic_target.load_state_dict(critic.state_dict())
 
 actor_optimizer = optim.Adam(actor.parameters(), lr=cfg.lr)
 critic_optimizer = optim.Adam(critic.parameters(), lr=cfg.lr)
