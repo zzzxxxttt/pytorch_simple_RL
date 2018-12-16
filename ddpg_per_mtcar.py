@@ -36,19 +36,66 @@ cfg = parser.parse_args()
 
 
 class Memory(object):
-  def __init__(self, memory_size=10000):
-    self.memory = deque(maxlen=memory_size)
-    self.memory_size = memory_size
+  def __init__(self, batch_size, alpha=0.5, beta=0.5, maximum_size=10000):
+    self.memory = []
+    self.pointer = -1
+    self.alpha = alpha
+    self.beta = beta
+    self.batch_size = batch_size
+    self.maximum_size = maximum_size
+    self.max_priority = 0
+
+    self.segs = None
+    self.probs = None
 
   def __len__(self):
     return len(self.memory)
 
   def append(self, item):
-    self.memory.append(item)
+    if len(self.memory) < self.maximum_size:
+      self.memory.append([item, self.max_priority])
+      self.pointer += 1
+    else:
+      self.pointer = (self.pointer + 1) % self.maximum_size
+      self.memory[self.pointer] = [item, self.max_priority]
 
-  def sample_batch(self, batch_size):
-    idx = np.random.permutation(len(self.memory))[:batch_size]
-    return [self.memory[i] for i in idx]
+  def sample_batch(self, epsilon):
+    # if the length of memory changes, re-segment the memory
+    if len(self.memory) < self.maximum_size:
+      self.segment()
+    # uniformly sample in each segment
+    inds = [np.random.randint(self.segs[i], self.segs[i + 1]) for i in range(self.batch_size)]
+    batch_samples, _ = zip(*[self.memory[i] for i in inds])
+
+    # calculate the IS weight
+    beta = (1 - self.beta) * (1 - epsilon) + self.beta
+    batch_weights = [(len(self.memory) * self.probs[i]) ** -beta for i in inds]
+    batch_weights = np.array(batch_weights) / np.amax(batch_weights)
+
+    return batch_samples, batch_weights, inds
+
+  def rebalance(self):
+    # not efficient than the binary heap, but quick enough for our toy example
+    self.memory = sorted(self.memory, key=lambda x: x[-1], reverse=True)
+
+  def update(self, inds, priorities):
+    for ind, priority in zip(inds, priorities):
+      self.memory[ind] = [self.memory[ind][0], priority]
+    if self.max_priority < np.amax(priorities):
+      self.max_priority = np.amax(priorities)
+
+  def segment(self):
+    segment_p = 1 / self.batch_size
+    ranks = np.array([(1 / i) ** self.alpha for i in range(1, len(self.memory) + 1)])
+    self.probs = ranks / np.sum(ranks)
+    cum_probs = np.cumsum(self.probs)
+    self.segs = [0]
+    for i in range(len(self.memory)):
+      if cum_probs[i] > segment_p:
+        self.segs.append(i + 1)
+        segment_p += 1 / self.batch_size
+    self.segs.append(len(self.memory))
+    return
 
 
 # Simple Ornstein-Uhlenbeck Noise generator
@@ -118,24 +165,25 @@ def get_q_value(_critic, state, action):
   return q_value
 
 
-def update_actor(state):
+def update_actor(state, IS_weights):
   action = actor(state)
   action = torch.clamp(action, float(env.action_space.low[0]), float(env.action_space.high[0]))
   # using chain rule to calculate the gradients of actor
-  q_value = -torch.mean(critic(state, action))
+  q_value = -torch.mean(IS_weights * critic(state, action))
   actor_optimizer.zero_grad()
   q_value.backward()
   actor_optimizer.step()
   return
 
 
-def update_critic(state, action, target):
+def update_critic(state, action, target, IS_weights):
   q_value = critic(state, action)
-  loss = F.mse_loss(q_value, target)
+  loss = (IS_weights * (q_value - target) ** 2).mean()
+  td_errors = torch.abs(q_value - target).squeeze().detach().cpu().numpy()
   critic_optimizer.zero_grad()
   loss.backward()
   critic_optimizer.step()
-  return
+  return td_errors
 
 
 def soft_update(target, source, tau):
@@ -168,7 +216,7 @@ def main():
   episode_steps = 0
   memory_warmup = cfg.batch_size * 3
 
-  memory = Memory(memory_size=10000)
+  memory = Memory(batch_size=cfg.batch_size, maximum_size=10000)
   start_time = time.perf_counter()
   while episode < cfg.max_episode:
     print('\riter {}, ep {}'.format(iteration_now, episode), end='')
@@ -183,24 +231,30 @@ def main():
     memory.append([state, action, reward, next_state, done])
 
     if iteration >= memory_warmup:
-      memory_batch = memory.sample_batch(cfg.batch_size)
+      if iteration % 10 == 0:
+        memory.rebalance()
+      sample_batch, IS_weights, inds = memory.sample_batch(1 - episode / cfg.max_episode)
+
+      IS_weights = torch.tensor(IS_weights).float().cuda()[:, None]
 
       state_batch, \
       action_batch, \
       reward_batch, \
       next_state_batch, \
-      done_batch = map(lambda x: torch.tensor(x).float().cuda(), zip(*memory_batch))
+      done_batch = map(lambda x: torch.tensor(x).float().cuda(), zip(*sample_batch))
 
       action_next = get_action(actor_target, next_state_batch)
 
       # using discounted reward as target q-value to update critic
       Q_next = get_q_value(critic_target, next_state_batch, action_next).detach()
       Q_target_batch = reward_batch[:, None] + cfg.gamma * (1 - done_batch[:, None]) * Q_next
-      update_critic(state_batch, action_batch[:, None], Q_target_batch)
+
+      deltas = update_critic(state_batch, action_batch[:, None], Q_target_batch, IS_weights)
 
       # the action corresponds to the state_batch now is nolonger the action stored in buffer,
       # so we need to use actor to compute the action first, then use the critic to compute the q-value
-      update_actor(state_batch)
+      update_actor(state_batch, IS_weights)
+      memory.update(inds, deltas)
 
       # soft update
       soft_update(actor_target, actor, cfg.tau)
