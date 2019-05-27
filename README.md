@@ -1,4 +1,4 @@
-# Reinforcement learning algorithms **in one file**
+# Simple pytorch implmentation of reinforcement learning algorithms
 
 This repository is for those who want to implement the RL algorithms after reading the corresponding papers.
 All the algorithms are encapsulated in one file as minimum working examples, which let you focus more on the algorithm themselves.
